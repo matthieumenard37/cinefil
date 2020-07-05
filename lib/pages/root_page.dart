@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../pages/login_signup_page.dart';
 import '../services/authentication.dart';
 import '../pages/home_page.dart';
+import 'movie_list.dart';
 
 enum AuthStatus {
   NOT_DETERMINED,
@@ -77,7 +78,7 @@ class _RootPageState extends State<RootPage> {
         break;
       case AuthStatus.LOGGED_IN:
         if (_userId.length > 0 && _userId != null) {
-          return new HomePage(
+          return new MovieList(
             // userId: _userId,
             // auth: widget.auth,
             // logoutCallback: logoutCallback,
