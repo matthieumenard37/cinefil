@@ -1,11 +1,22 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'movie_detail.dart';
+import '../services/authentication.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../models/favorites.dart';
 
 class MovieList extends StatefulWidget {
+  MovieList({Key key, this.userId, this.logoutCallback, this.auth}) : super(key: key);
+
+  final String userId;
+  final BaseAuth auth;
+  final VoidCallback logoutCallback;
+  var isFavoritePage = false;
   @override
   MovieListState createState() {
     return new MovieListState();
@@ -13,7 +24,68 @@ class MovieList extends StatefulWidget {
 }
 
 class MovieListState extends State<MovieList> {
+  List<Favorite> _favorites;
 
+  final FirebaseDatabase _database = FirebaseDatabase.instance;
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+  final _textEditingController = TextEditingController();
+  StreamSubscription<Event> _onFavoriteAddedSubscription;
+  StreamSubscription<Event> _onFavoriteChangedSubscription;
+  StreamSubscription<Event> _onFavoriteDeleteSubscription;
+  Query _favoritesQuery;
+
+  //bool _isEmailVerified = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    //_checkEmailVerification();
+
+    _favorites = new List();
+    _favoritesQuery = _database
+        .reference()
+        .child("favorite")
+        .orderByChild("userId")
+        .equalTo(widget.userId);
+    _onFavoriteAddedSubscription = _favoritesQuery.onChildAdded.listen(onEntryAdded);
+    _onFavoriteChangedSubscription =
+        _favoritesQuery.onChildChanged.listen(onEntryChanged);
+    _onFavoriteDeleteSubscription = _favoritesQuery.onChildRemoved.listen(onEntryRemoved);
+  }
+  @override
+  void dispose() {
+    _onFavoriteAddedSubscription.cancel();
+    _onFavoriteChangedSubscription.cancel();
+    _onFavoriteDeleteSubscription.cancel();
+    super.dispose();
+  }
+  onEntryChanged(Event event) {
+    var oldEntry = _favorites.singleWhere((entry) {
+      return entry.key == event.snapshot.key;
+    });
+    setState(() {
+      _favorites[_favorites.indexOf(oldEntry)] =
+          Favorite.fromSnapshot(event.snapshot);
+    });
+  }
+  onEntryAdded(Event event) {
+    setState(() {
+      _favorites.add(Favorite.fromSnapshot(event.snapshot));
+    });
+  }
+
+  onEntryRemoved(Event event) {
+    setState(() {
+      log("removing from movie list");
+      log(_favorites.length.toString());
+      var favoriteFromEvent = Favorite.fromSnapshot(event.snapshot);
+      var favoriteToDelete = _favorites.firstWhere((favorite) => favorite.id == favoriteFromEvent.id);
+      _favorites.remove(favoriteToDelete);
+      log(_favorites.length.toString());
+    });
+  }
   var movies;
   ///Color mainColor = const Color(0xffff1493);
   Color mainColor = const Color(0xffff69b4);
@@ -29,38 +101,75 @@ class MovieListState extends State<MovieList> {
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
+  createToolbarButtons() {
+    if (widget.isFavoritePage) {
+      return <Widget>[
+        new IconButton(
+          icon: Icon(Icons.movie),
+          color: toolbarColor,
+          onPressed: () {widget.isFavoritePage = false;},
+        )
+      ];
+    }
+    return <Widget>[
+      new IconButton(
+        icon: Icon(Icons.favorite),
+        color: toolbarColor,
+        onPressed: () {widget.isFavoritePage = true;},
+      )
+    ];
+
+  }
+
+  signOut() async {
+    try {
+      await widget.auth.signOut();
+      widget.logoutCallback();
+    } catch (e) {
+      print(e);
+    }
+  }
+
+
+    @override
+    Widget build(BuildContext context) {
     getData();
+
+    if (widget.isFavoritePage) {
+      List<Map> temporaryMovies = new List();
+      for (var index = 0; index < movies.length; ++index) {
+        _favorites.forEach((favorite) {
+          if (favorite.id == movies[index]["id"])
+            temporaryMovies.add(movies[index]);
+        });
+      }
+    movies = temporaryMovies;
+    }
     return new Scaffold(
       backgroundColor: backgroundColor,
       appBar: new AppBar(
         elevation: 0.3,
         centerTitle: true,
         backgroundColor: toolbarBackgroundColor,
-//        leading: new Icon(
-//          Icons.arrow_back,
-//          color: toolbarColor,
-//        ),
+        leading: new IconButton(
+          icon : Icon(Icons.power_settings_new),
+          color: toolbarColor,
+          onPressed: signOut,
+        ),
         title: new Text(
           'CINE ||| FIL',
           style: new TextStyle(color: toolbarColor,
               fontFamily: 'Arvo',
               fontWeight: FontWeight.bold),
         ),
-        actions: <Widget>[
-//          new Icon(
-//            Icons.menu,
-//            color: toolbarColor,
-//          )
-        ],
+        actions: createToolbarButtons(),
       ),
       body: new Padding(
         padding: const EdgeInsets.all(16.0),
         child: new Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            new MovieTitle(mainColor),
+            new MovieTitle(mainColor, widget.isFavoritePage),
             new Expanded(
               child: new ListView.builder(
                   itemCount: movies == null ? 0 : movies.length,
@@ -71,7 +180,9 @@ class MovieListState extends State<MovieList> {
                       padding: const EdgeInsets.all(0.0),
                       onPressed: (){
                         Navigator.push(context, new MaterialPageRoute(builder: (context){
-                          return new MovieDetail(movies[i]);
+                          return new MovieDetail(
+                              userId: widget.userId,
+                              movie: movies[i]);
                         }));
                       },
                       color: backgroundColor,
@@ -89,16 +200,18 @@ class MovieListState extends State<MovieList> {
 class MovieTitle extends StatelessWidget{
 
   final Color mainColor;
+  final isFavorite;
 
 
-  MovieTitle(this.mainColor);
+  MovieTitle(this.mainColor, this.isFavorite);
 
   @override
   Widget build(BuildContext context) {
+    String title = isFavorite ? "Favorites" : 'All Movies';
     return new Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
       child: new Text(
-        'All Movies',
+        title,
         style: new TextStyle(
             fontSize: 40.0,
             fontStyle: FontStyle.italic,
