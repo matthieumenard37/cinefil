@@ -87,11 +87,25 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
     });
   }
 
+  Color toolbarBackgroundColor = const Color(0xff322b4f);
+  Color toolbarColor = const Color(0xff9cffff);
+  Color mainColor = const Color(0xffff69b4);
+  Color backgroundColor = const Color(0xff3c345f);
+
   @override
   Widget build(BuildContext context) {
     return new Scaffold(
+        backgroundColor: toolbarColor,
         appBar: new AppBar(
-          title: new Text('Flutter login demo'),
+          title: new Text(
+            'CINE ||| FIL',
+            style: new TextStyle(color: toolbarColor,
+              fontFamily: 'Arvo',
+              fontWeight: FontWeight.bold),
+          ),
+          elevation: 0.3,
+          centerTitle: true,
+          backgroundColor: toolbarBackgroundColor,
         ),
         body: Stack(
           children: <Widget>[
@@ -180,7 +194,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
             hintText: 'Email',
             icon: new Icon(
               Icons.mail,
-              color: Colors.grey,
+              color: toolbarBackgroundColor,
             )),
         validator: (value) => value.isEmpty ? 'Email can\'t be empty' : null,
         onSaved: (value) => _email = value.trim(),
@@ -199,7 +213,7 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
             hintText: 'Password',
             icon: new Icon(
               Icons.lock,
-              color: Colors.grey,
+              color: toolbarBackgroundColor,
             )),
         validator: (value) => value.isEmpty ? 'Password can\'t be empty' : null,
         onSaved: (value) => _password = value.trim(),
@@ -224,9 +238,9 @@ class _LoginSignupPageState extends State<LoginSignupPage> {
             elevation: 5.0,
             shape: new RoundedRectangleBorder(
                 borderRadius: new BorderRadius.circular(30.0)),
-            color: Colors.blue,
+            color: toolbarBackgroundColor,
             child: new Text(_isLoginForm ? 'Login' : 'Create account',
-                style: new TextStyle(fontSize: 20.0, color: Colors.white)),
+                style: new TextStyle(fontSize: 20.0, color: toolbarColor)),
             onPressed: validateAndSubmit,
           ),
         ));
